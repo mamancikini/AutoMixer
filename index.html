@@ -15,14 +15,38 @@
             -webkit-tap-highlight-color: transparent;
         }
         
+        .title-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 28px;
+        }
+
         h2 { 
             font-size: 24px; 
             font-weight: 700; 
-            margin-bottom: 28px; 
             color: #111; 
             letter-spacing: -0.5px;
-            text-align: center;
+            margin: 0; 
         }
+
+        .notif-btn {
+            background: #ffffff;
+            border: none;
+            border-radius: 50%;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            transition: transform 0.1s, background-color 0.2s;
+        }
+        .notif-btn:active { transform: scale(0.9); }
+        .notif-btn.active { background-color: #d4f5d6; } 
 
         .box {
             background: #ffffff;
@@ -273,7 +297,10 @@
 </head>
 <body>
 
-    <h2>Link AutoMixer</h2>
+    <div class="title-container">
+        <h2>Link AutoMixer</h2>
+        <button id="notifToggleBtn" class="notif-btn" onclick="toggleNotification()" title="Nyalakan Alarm Jam 10 Malam">🔔</button>
+    </div>
 
     <div class="box">
         <div class="header-row">
@@ -319,9 +346,11 @@
         let lastLengthShopee = 0;
         let lastLengthTweet = 0;
         let currentActiveHistoryId = null;
+        let alarmInterval = null;
 
         window.onload = function() {
             renderHistory();
+            checkNotifStatus(); 
             
             let sInput = document.getElementById('inputShopee');
             let tInput = document.getElementById('inputTweet');
@@ -377,6 +406,72 @@
             }
         };
 
+        // MESIN ALARM & NOTIFIKASI
+        function toggleNotification() {
+            let btn = document.getElementById('notifToggleBtn');
+            
+            if (!("Notification" in window)) {
+                alert("Browser HP lu nggak support notifikasi web bro.");
+                return;
+            }
+
+            if (Notification.permission === "granted") {
+                if (btn.classList.contains('active')) {
+                    btn.classList.remove('active');
+                    if (alarmInterval) clearInterval(alarmInterval);
+                    localStorage.setItem('refal_notif_active', 'false');
+                    alert("Alarm jam 10 malam dimatikan.");
+                } else {
+                    btn.classList.add('active');
+                    localStorage.setItem('refal_notif_active', 'true');
+                    startAlarmMachine();
+                    alert("Alarm aktif! Biarkan aplikasi terbuka di background biar notif jam 10 malem bisa masuk.");
+                }
+            } else if (Notification.permission !== "denied") {
+                Notification.requestPermission().then(function (permission) {
+                    if (permission === "granted") {
+                        btn.classList.add('active');
+                        localStorage.setItem('refal_notif_active', 'true');
+                        startAlarmMachine();
+                        alert("Izin diberikan! Alarm jam 10 malam aktif.");
+                    } else {
+                        alert("Izin notifikasi ditolak.");
+                    }
+                });
+            } else {
+                alert("Izin notif ditolak permanen. Buka setting HP > Aplikasi > AutoMixer > Izinkan Notifikasi.");
+            }
+        }
+
+        function checkNotifStatus() {
+            let isActive = localStorage.getItem('refal_notif_active') === 'true';
+            let btn = document.getElementById('notifToggleBtn');
+            if (isActive && Notification.permission === "granted") {
+                btn.classList.add('active');
+                startAlarmMachine();
+            }
+        }
+
+        function startAlarmMachine() {
+            if (alarmInterval) clearInterval(alarmInterval);
+            alarmInterval = setInterval(() => {
+                let now = new Date();
+                if (now.getHours() === 22 && now.getMinutes() === 0 && now.getSeconds() === 0) {
+                    fireNotification();
+                }
+            }, 1000);
+        }
+
+        function fireNotification() {
+            let options = {
+                body: "Udah jam 10 malem nih bro! Waktunya post racikan link ke X.",
+                icon: "https://cdn-icons-png.flaticon.com/512/3254/3254068.png", 
+                vibrate: [200, 100, 200]
+            };
+            new Notification("Link AutoMixer", options);
+        }
+
+        // FUNGSI LAINNYA 
         function toggleDone(checkbox) {
             if (checkbox.checked) {
                 checkbox.setAttribute('checked', 'checked'); 
@@ -505,7 +600,6 @@
                     let urlRegex = /(https?:\/\/[^\s]+)/g;
                     let foundUrls = fullText.match(urlRegex) || [];
 
-                    // GABUNGKAN CAPTION: Hapus semua link dari teks asli cuitan buat ngambil judulnya doang
                     let caption = fullText.replace(urlRegex, '').trim();
 
                     if (foundUrls.length > 0) {
@@ -529,7 +623,6 @@
                         if (batchLinksData.length > 0) {
                             let plainTextArr = [];
 
-                            // MASUKIN CAPTION KE BARIS PALING ATAS KALAU ADA
                             if (caption !== '') {
                                 plainTextArr.push(caption);
                             }
